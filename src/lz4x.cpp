@@ -8,13 +8,13 @@ Written and placed in the public domain by Ilya Muravyov
 
 #ifndef _WIN32
 
-#define _FILE_OFFSET_BITS 64
-#define _fseeki64 fseeko64
-#define _ftelli64 ftello64
-#define _stati64 stat
+#  define _FILE_OFFSET_BITS 64
+#  define _fseeki64 fseeko64
+#  define _ftelli64 ftello64
+#  define _stati64 stat
 
-#define __min(a, b) ((a)<(b)?(a):(b))
-#define __max(a, b) ((a)>(b)?(a):(b))
+#  define __min(a, b) ((a)<(b)?(a):(b))
+#  define __max(a, b) ((a)>(b)?(a):(b))
 
 #endif
 
@@ -29,21 +29,21 @@ Written and placed in the public domain by Ilya Muravyov
 
 #ifndef NO_UTIME
 
-#include <sys/types.h>
-#include <sys/stat.h>
+#  include <sys/types.h>
+#  include <sys/stat.h>
 
-#ifdef _WIN32
-#include <sys/utime.h>
-#else
-#include <utime.h>
-#endif
+#  ifdef _WIN32
+#    include <sys/utime.h>
+#  else
+#    include <utime.h>
+#  endif
 
 #endif
 
 typedef unsigned char byte;
 typedef unsigned int uint;
 
-#define LZ4_MAGIC_NUMBER 0x184C2102
+#define LZ4_MAGIC 0x184C2102
 #define BLOCK_SIZE (8<<20) // 8 MB
 #define PADDING_LITERALS 8
 
@@ -84,8 +84,8 @@ void compress(const int max_chain)
   static int head[HASH_SIZE];
   static int tail[WSIZE];
 
-#ifdef LZ4_MAGIC_NUMBER
-  const uint magic=LZ4_MAGIC_NUMBER;
+#ifdef LZ4_MAGIC
+  const uint magic=LZ4_MAGIC;
   fwrite(&magic, 1, sizeof(magic), fout);
 #endif
 
@@ -241,8 +241,8 @@ void compress_optimal()
     int dist;
   } path[BLOCK_SIZE+1];
 
-#ifdef LZ4_MAGIC_NUMBER
-  const uint magic=LZ4_MAGIC_NUMBER;
+#ifdef LZ4_MAGIC
+  const uint magic=LZ4_MAGIC;
   fwrite(&magic, 1, sizeof(magic), fout);
 #endif
 
@@ -462,18 +462,18 @@ void compress_optimal()
 
 int decompress()
 {
-#ifdef LZ4_MAGIC_NUMBER
+#ifdef LZ4_MAGIC
   uint magic;
   fread(&magic, 1, sizeof(magic), fin);
-  if (magic!=LZ4_MAGIC_NUMBER)
+  if (magic!=LZ4_MAGIC)
     return 2;
 #endif
 
   int bsize;
   while (fread(&bsize, 1, sizeof(bsize), fin)>0)
   {
-#ifdef LZ4_MAGIC_NUMBER
-    if (bsize==LZ4_MAGIC_NUMBER)
+#ifdef LZ4_MAGIC
+    if (bsize==LZ4_MAGIC)
       continue;
 #endif
 
@@ -654,7 +654,7 @@ int main(int argc, char** argv)
     case 1:
       fprintf(stderr, "File corrupted!\n");
       exit(1);
-#ifdef LZ4_MAGIC_NUMBER
+#ifdef LZ4_MAGIC
     case 2:
       fprintf(stderr, "Not in Legacy format!\n");
       exit(1);
