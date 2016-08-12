@@ -6,7 +6,7 @@ Written and placed in the public domain by Ilya Muravyov
 
 */
 
-#ifdef __GNUC__
+#ifndef _WIN32
 
 #define _FILE_OFFSET_BITS 64
 #define _fseeki64 fseeko64
@@ -16,7 +16,7 @@ Written and placed in the public domain by Ilya Muravyov
 #define __min(a, b) ((a)<(b)?(a):(b))
 #define __max(a, b) ((a)>(b)?(a):(b))
 
-#endif // __GNUC__
+#endif
 
 #define _CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES 1
 #define _CRT_SECURE_NO_WARNINGS
@@ -54,11 +54,20 @@ byte buf[BLOCK_SIZE+COMPRESS_BOUND];
 #define HASH_SIZE (1<<HASH_LOG)
 #define NIL (-1)
 
-#define LOAD32(p) (*reinterpret_cast<const uint*>(&buf[p]))
-#define HASH32(p) ((LOAD32(p)*0x125A517D)>>(32-HASH_LOG))
+#ifdef FORCE_UNALIGNED
+#define load32(p) (*reinterpret_cast<const uint*>(&buf[p]))
+#else
+inline uint load32(int p)
+{
+  uint x;
+  memcpy(&x, &buf[p], sizeof(uint));
+  return x;
+}
+#endif
+#define hash32(p) ((load32(p)*0x125A517D)>>(32-HASH_LOG))
 
-#define GET_BYTE() buf[BLOCK_SIZE+(bp++)]
-#define PUT_BYTE(c) (buf[BLOCK_SIZE+(bsize++)]=(c))
+#define get_byte() buf[BLOCK_SIZE+(bp++)]
+#define put_byte(c) (buf[BLOCK_SIZE+(bsize++)]=(c))
 
 FILE* fin;
 FILE* fout;
@@ -84,7 +93,7 @@ void compress(const int max_chain)
     perror("Ftell failed");
     exit(1);
   }
-  rewind(fin);  
+  rewind(fin);
 
   int n;
   while ((n=fread(buf, 1, BLOCK_SIZE, fin))>0)
@@ -107,10 +116,10 @@ void compress(const int max_chain)
         int chain_len=max_chain;
         const int wstart=__max(p-WSIZE, NIL);
 
-        int s=head[HASH32(p)];
+        int s=head[hash32(p)];
         while (s>wstart)
         {
-          if (buf[s+best_len]==buf[p+best_len] && LOAD32(s)==LOAD32(p))
+          if (buf[s+best_len]==buf[p+best_len] && load32(s)==load32(p))
           {
             int len=MIN_MATCH;
             while (len<max_match && buf[s+len]==buf[p+len])
@@ -143,45 +152,45 @@ void compress(const int max_chain)
           int run=p-pp;
           if (run>=15)
           {
-            PUT_BYTE((15<<4)+adder);
+            put_byte((15<<4)+adder);
 
             run-=15;
             for (; run>=255; run-=255)
-              PUT_BYTE(255);
-            PUT_BYTE(run);
+              put_byte(255);
+            put_byte(run);
           }
           else
-            PUT_BYTE((run<<4)+adder);
+            put_byte((run<<4)+adder);
 
           while (pp<p)
-            PUT_BYTE(buf[pp++]);
+            put_byte(buf[pp++]);
         }
         else
-          PUT_BYTE(adder);
+          put_byte(adder);
 
-        PUT_BYTE(dist);
-        PUT_BYTE(dist>>8);
+        put_byte(dist);
+        put_byte(dist>>8);
 
         if (len>=15)
         {
           len-=15;
           for (; len>=255; len-=255)
-            PUT_BYTE(255);
-          PUT_BYTE(len);
+            put_byte(255);
+          put_byte(len);
         }
 
         pp=p+best_len;
 
         while (p<pp)
         {
-          const uint h=HASH32(p);
+          const uint h=hash32(p);
           tail[p&WMASK]=head[h];
           head[h]=p++;
         }
       }
       else
       {
-        const uint h=HASH32(p);
+        const uint h=hash32(p);
         tail[p&WMASK]=head[h];
         head[h]=p++;
       }
@@ -192,18 +201,18 @@ void compress(const int max_chain)
       int run=p-pp;
       if (run>=15)
       {
-        PUT_BYTE(15<<4);
+        put_byte(15<<4);
 
         run-=15;
         for (; run>=255; run-=255)
-          PUT_BYTE(255);
-        PUT_BYTE(run);
+          put_byte(255);
+        put_byte(run);
       }
       else
-        PUT_BYTE(run<<4);
+        put_byte(run<<4);
 
       while (pp<p)
-        PUT_BYTE(buf[pp++]);
+        put_byte(buf[pp++]);
     }
 
     fwrite(&bsize, 1, sizeof(bsize), fout);
@@ -241,7 +250,7 @@ void compress_optimal()
     perror("Ftell failed");
     exit(1);
   }
-  rewind(fin);  
+  rewind(fin);
 
   int n;
   while ((n=fread(buf, 1, BLOCK_SIZE, fin))>0)
@@ -267,7 +276,7 @@ void compress_optimal()
 
         const int wstart=__max(p-WSIZE, NIL);
 
-        const uint h=HASH32(p);
+        const uint h=hash32(p);
         int s=head[h];
         head[h]=p;
 
@@ -317,15 +326,15 @@ void compress_optimal()
 
     path[n].bcount=0;
 
-    int state=15;
+    int rstate=15;
 
     for (int p=n-1; p>0; --p)
     {
       int c0=path[p+1].bcount+1;
 
-      if (!--state)
+      if (!--rstate)
       {
-        state=255;
+        rstate=255;
         ++c0;
       }
 
@@ -359,7 +368,7 @@ void compress_optimal()
           path[p].len=0;
         }
         else
-          state=15;
+          rstate=15;
       }
       else
         path[p].bcount=c0;
@@ -383,31 +392,31 @@ void compress_optimal()
           int run=p-pp;
           if (run>=15)
           {
-            PUT_BYTE((15<<4)+adder);
+            put_byte((15<<4)+adder);
 
             run-=15;
             for (; run>=255; run-=255)
-              PUT_BYTE(255);
-            PUT_BYTE(run);
+              put_byte(255);
+            put_byte(run);
           }
           else
-            PUT_BYTE((run<<4)+adder);
+            put_byte((run<<4)+adder);
 
           while (pp<p)
-            PUT_BYTE(buf[pp++]);
+            put_byte(buf[pp++]);
         }
         else
-          PUT_BYTE(adder);
+          put_byte(adder);
 
-        PUT_BYTE(path[p].dist);
-        PUT_BYTE(path[p].dist>>8);
+        put_byte(path[p].dist);
+        put_byte(path[p].dist>>8);
 
         if (len>=15)
         {
           len-=15;
           for (; len>=255; len-=255)
-            PUT_BYTE(255);
-          PUT_BYTE(len);
+            put_byte(255);
+          put_byte(len);
         }
 
         p+=path[p].len;
@@ -423,18 +432,18 @@ void compress_optimal()
       int run=p-pp;
       if (run>=15)
       {
-        PUT_BYTE(15<<4);
+        put_byte(15<<4);
 
-	run-=15;
+        run-=15;
         for (; run>=255; run-=255)
-          PUT_BYTE(255);
-        PUT_BYTE(run);
+          put_byte(255);
+        put_byte(run);
       }
       else
-        PUT_BYTE(run<<4);
+        put_byte(run<<4);
 
       while (pp<p)
-        PUT_BYTE(buf[pp++]);
+        put_byte(buf[pp++]);
     }
 
     fwrite(&bsize, 1, sizeof(bsize), fout);
@@ -470,7 +479,7 @@ int decompress()
     int bp=0;
     while (bp<bsize)
     {
-      const int tag=GET_BYTE();
+      const int tag=get_byte();
       if (tag>=16)
       {
         int run=tag>>4;
@@ -478,31 +487,31 @@ int decompress()
         {
           for (;;)
           {
-            const int c=GET_BYTE();
+            const int c=get_byte();
             run+=c;
             if (c!=255)
               break;
           }
         }
 
-        buf[p++]=GET_BYTE();
+        buf[p++]=get_byte();
 
         while (--run)
-          buf[p++]=GET_BYTE();
+          buf[p++]=get_byte();
 
         if (bp>=bsize)
           break;
       }
 
-      int s=p-GET_BYTE();
-      s-=GET_BYTE()<<8;
+      int s=p-get_byte();
+      s-=get_byte()<<8;
 
       int len=tag&15;
       if (len==15)
       {
         for (;;)
         {
-          const int c=GET_BYTE();
+          const int c=get_byte();
           len+=c;
           if (c!=255)
             break;
@@ -570,7 +579,7 @@ int main(int argc, char** argv)
   if (argc<2)
   {
     fprintf(stderr,
-        "LZ4X - An optimized LZ4 compressor, v1.10\n"
+        "LZ4X - An optimized LZ4 compressor, v1.12\n"
         "\n"
         "Usage: %s [options] infile [outfile]\n"
         "\n"
