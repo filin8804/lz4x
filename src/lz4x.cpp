@@ -223,7 +223,7 @@ void compress_optimal()
 
     int len;
     int dist;
-  } path[BLOCK_SIZE];
+  } path[BLOCK_SIZE+1];
 
 #ifdef LZ4_MAGIC_NUMBER
   const uint magic=LZ4_MAGIC_NUMBER;
