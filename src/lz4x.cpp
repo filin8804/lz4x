@@ -28,9 +28,16 @@ Written and placed in the public domain by Ilya Muravyov
 #include <time.h>
 
 #ifndef NO_UTIME
+
 #include <sys/types.h>
 #include <sys/stat.h>
+
+#ifdef _WIN32
 #include <sys/utime.h>
+#else
+#include <utime.h>
+#endif
+
 #endif
 
 typedef unsigned char byte;
