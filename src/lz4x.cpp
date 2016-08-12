@@ -7,15 +7,14 @@ Written and placed in the public domain by Ilya Muravyov
 */
 
 #ifndef _WIN32
-
 #  define _FILE_OFFSET_BITS 64
+
 #  define _fseeki64 fseeko64
 #  define _ftelli64 ftello64
 #  define _stati64 stat
 
 #  define __min(a, b) ((a)<(b)?(a):(b))
 #  define __max(a, b) ((a)>(b)?(a):(b))
-
 #endif
 
 #define _CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES 1
@@ -28,7 +27,6 @@ Written and placed in the public domain by Ilya Muravyov
 #include <time.h>
 
 #ifndef NO_UTIME
-
 #  include <sys/types.h>
 #  include <sys/stat.h>
 
@@ -37,7 +35,6 @@ Written and placed in the public domain by Ilya Muravyov
 #  else
 #    include <utime.h>
 #  endif
-
 #endif
 
 typedef unsigned char byte;
@@ -62,14 +59,14 @@ byte buf[BLOCK_SIZE+COMPRESS_BOUND];
 #define NIL (-1)
 
 #ifdef FORCE_UNALIGNED
-#define load32(p) (*reinterpret_cast<const uint*>(&buf[p]))
+#  define load32(p) (*reinterpret_cast<const uint*>(&buf[p]))
 #else
-inline uint load32(int p)
-{
-  uint x;
-  memcpy(&x, &buf[p], sizeof(uint));
-  return x;
-}
+  inline uint load32(int p)
+  {
+    uint x;
+    memcpy(&x, &buf[p], sizeof(uint));
+    return x;
+  }
 #endif
 #define hash32(p) ((load32(p)*0x125A517D)>>(32-HASH_LOG))
 
