@@ -6,11 +6,11 @@ Written and placed in the public domain by Ilya Muravyov
 
 */
 
-#ifndef _WIN32
+#ifndef _MSC_VER
 #  define _FILE_OFFSET_BITS 64
 
-#  define _fseeki64 fseeko64
-#  define _ftelli64 ftello64
+#  define _fseeki64 fseeko
+#  define _ftelli64 ftello
 #  define _stati64 stat
 
 #  define __min(a, b) ((a)<(b)?(a):(b))
@@ -30,7 +30,7 @@ Written and placed in the public domain by Ilya Muravyov
 #  include <sys/types.h>
 #  include <sys/stat.h>
 
-#  ifdef _WIN32
+#  ifdef _MSC_VER
 #    include <sys/utime.h>
 #  else
 #    include <utime.h>
@@ -59,7 +59,7 @@ byte buf[BLOCK_SIZE+COMPRESS_BOUND];
 #define NIL (-1)
 
 #ifdef FORCE_UNALIGNED
-#  define load32(p) (*reinterpret_cast<const uint*>(&buf[p]))
+#  define load32(p) (*((const uint*)&buf[p]))
 #else
   inline uint load32(int p)
   {
@@ -86,18 +86,9 @@ void compress(const int max_chain)
   fwrite(&magic, 1, sizeof(magic), fout);
 #endif
 
-  if (_fseeki64(fin, 0, SEEK_END))
-  {
-    perror("Fseek failed");
-    exit(1);
-  }
+  _fseeki64(fin, 0, SEEK_END);
   const long long flen=_ftelli64(fin);
-  if (flen<0)
-  {
-    perror("Ftell failed");
-    exit(1);
-  }
-  rewind(fin);
+  _fseeki64(fin, 0, SEEK_SET);
 
   int n;
   while ((n=fread(buf, 1, BLOCK_SIZE, fin))>0)
@@ -222,7 +213,8 @@ void compress(const int max_chain)
     fwrite(&bsize, 1, sizeof(bsize), fout);
     fwrite(&buf[BLOCK_SIZE], 1, bsize, fout);
 
-    fprintf(stderr, "%3d%%\r", static_cast<int>((_ftelli64(fin)*100)/flen));
+    if (flen>0)
+      fprintf(stderr, "%3d%%\r", int((_ftelli64(fin)*100)/flen));
   }
 }
 
@@ -243,18 +235,9 @@ void compress_optimal()
   fwrite(&magic, 1, sizeof(magic), fout);
 #endif
 
-  if (_fseeki64(fin, 0, SEEK_END))
-  {
-    perror("Fseek failed");
-    exit(1);
-  }
+  _fseeki64(fin, 0, SEEK_END);
   const long long flen=_ftelli64(fin);
-  if (flen<0)
-  {
-    perror("Ftell failed");
-    exit(1);
-  }
-  rewind(fin);
+  _fseeki64(fin, 0, SEEK_SET);
 
   int n;
   while ((n=fread(buf, 1, BLOCK_SIZE, fin))>0)
@@ -453,7 +436,8 @@ void compress_optimal()
     fwrite(&bsize, 1, sizeof(bsize), fout);
     fwrite(&buf[BLOCK_SIZE], 1, bsize, fout);
 
-    fprintf(stderr, "%3d%%\r", static_cast<int>((_ftelli64(fin)*100)/flen));
+    if (flen>0)
+      fprintf(stderr, "%3d%%\r", int((_ftelli64(fin)*100)/flen));
   }
 }
 
@@ -583,7 +567,7 @@ int main(int argc, char** argv)
   if (argc<2)
   {
     fprintf(stderr,
-        "LZ4X - An optimized LZ4 compressor, v1.12\n"
+        "LZ4X - An optimized LZ4 compressor, v1.15\n"
         "\n"
         "Usage: %s [options] infile [outfile]\n"
         "\n"
@@ -669,7 +653,7 @@ int main(int argc, char** argv)
   }
 
   fprintf(stderr, "%lld -> %lld in %1.2fs\n", _ftelli64(fin), _ftelli64(fout),
-      static_cast<double>(clock()-start)/CLOCKS_PER_SEC);
+      double(clock()-start)/CLOCKS_PER_SEC);
 
   fclose(fin);
   fclose(fout);
