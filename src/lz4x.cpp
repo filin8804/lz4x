@@ -252,7 +252,7 @@ void compress_optimal()
       int best_len=0;
       int dist;
 
-      const int max_match=(n-PADDING_LITERALS)-p;
+      const int max_match=__min(1<<14, (n-PADDING_LITERALS)-p); // [!]
       if (max_match>=MIN_MATCH)
       {
         int* left=&nodes[p&WMASK][1];
@@ -567,7 +567,7 @@ int main(int argc, char** argv)
   if (argc<2)
   {
     fprintf(stderr,
-        "LZ4X - An optimized LZ4 compressor, v1.15\n"
+        "LZ4X - An optimized LZ4 compressor, v1.20\n"
         "\n"
         "Usage: %s [options] infile [outfile]\n"
         "\n"
@@ -649,7 +649,7 @@ int main(int argc, char** argv)
     if (level==9)
       compress_optimal();
     else
-      compress(level==8?8192:1<<level);
+      compress(level==8?WSIZE:1<<level);
   }
 
   fprintf(stderr, "%lld -> %lld in %1.2fs\n", _ftelli64(fin), _ftelli64(fout),
