@@ -69,6 +69,7 @@ byte buf[BLOCK_SIZE+COMPRESS_BOUND];
   }
 #endif
 #define hash32(p) ((load32(p)*0x125A517D)>>(32-HASH_LOG))
+#define copy128(p, s) memcpy(&buf[p], &buf[s], 16)
 
 #define get_byte() buf[BLOCK_SIZE+(bp++)]
 #define put_byte(c) (buf[BLOCK_SIZE+(bsize++)]=(c))
@@ -140,14 +141,14 @@ void compress(const int max_chain)
       if (best_len>=MIN_MATCH)
       {
         int len=best_len-MIN_MATCH;
-        const int adder=__min(len, 15);
+        const int ml=__min(len, 15);
 
         if (pp<p)
         {
           int run=p-pp;
           if (run>=15)
           {
-            put_byte((15<<4)+adder);
+            put_byte((15<<4)+ml);
 
             run-=15;
             for (; run>=255; run-=255)
@@ -155,13 +156,13 @@ void compress(const int max_chain)
             put_byte(run);
           }
           else
-            put_byte((run<<4)+adder);
+            put_byte((run<<4)+ml);
 
           while (pp<p)
             put_byte(buf[pp++]);
         }
         else
-          put_byte(adder);
+          put_byte(ml);
 
         put_byte(dist);
         put_byte(dist>>8);
@@ -224,7 +225,7 @@ void compress_optimal()
   static int nodes[WSIZE][2];
   static struct
   {
-    int bcount;
+    int cum;
 
     int len;
     int dist;
@@ -311,27 +312,27 @@ void compress_optimal()
 
     // Pass 2: Build the shortest path
 
-    path[n].bcount=0;
+    path[n].cum=0;
 
-    int rstate=15;
+    int cnt=15;
 
     for (int p=n-1; p>0; --p)
     {
-      int c0=path[p+1].bcount+1;
+      int c0=path[p+1].cum+1;
 
-      if (!--rstate)
+      if (!--cnt)
       {
-        rstate=255;
+        cnt=255;
         ++c0;
       }
 
       if (path[p].len>=MIN_MATCH)
       {
-        path[p].bcount=1<<30;
+        path[p].cum=1<<30;
 
         for (int i=path[p].len; i>=MIN_MATCH; --i)
         {
-          int c1=path[p+i].bcount+3;
+          int c1=path[p+i].cum+3;
 
           int len=i-MIN_MATCH;
           if (len>=15)
@@ -342,23 +343,23 @@ void compress_optimal()
             ++c1;
           }
 
-          if (c1<path[p].bcount)
+          if (c1<path[p].cum)
           {
-            path[p].bcount=c1;
+            path[p].cum=c1;
             path[p].len=i;
           }
         }
 
-        if (c0<path[p].bcount)
+        if (c0<path[p].cum)
         {
-          path[p].bcount=c0;
+          path[p].cum=c0;
           path[p].len=0;
         }
         else
-          rstate=15;
+          cnt=15;
       }
       else
-        path[p].bcount=c0;
+        path[p].cum=c0;
     }
 
     // Pass 3: Output the codes
@@ -372,14 +373,14 @@ void compress_optimal()
       if (path[p].len>=MIN_MATCH)
       {
         int len=path[p].len-MIN_MATCH;
-        const int adder=__min(len, 15);
+        const int ml=__min(len, 15);
 
         if (pp<p)
         {
           int run=p-pp;
           if (run>=15)
           {
-            put_byte((15<<4)+adder);
+            put_byte((15<<4)+ml);
 
             run-=15;
             for (; run>=255; run-=255)
@@ -387,13 +388,13 @@ void compress_optimal()
             put_byte(run);
           }
           else
-            put_byte((run<<4)+adder);
+            put_byte((run<<4)+ml);
 
           while (pp<p)
             put_byte(buf[pp++]);
         }
         else
-          put_byte(adder);
+          put_byte(ml);
 
         put_byte(path[p].dist);
         put_byte(path[p].dist>>8);
@@ -480,12 +481,15 @@ int decompress()
             if (c!=255)
               break;
           }
+
+          for (int i=0; i<run; i+=16)
+            copy128(p+i, BLOCK_SIZE+bp+i);
         }
+        else
+          copy128(p, BLOCK_SIZE+bp);
 
-        buf[p++]=get_byte();
-
-        while (--run)
-          buf[p++]=get_byte();
+        p+=run;
+        bp+=run;
 
         if (bp>=bsize)
           break;
@@ -505,14 +509,19 @@ int decompress()
             break;
         }
       }
+      len+=4;
 
-      buf[p++]=buf[s++];
-      buf[p++]=buf[s++];
-      buf[p++]=buf[s++];
-      buf[p++]=buf[s++];
-
-      while (len--)
-        buf[p++]=buf[s++];
+      if ((p-s)>=16)
+      {
+        for (int i=0; i<len; i+=16)
+          copy128(p+i, s+i);
+        p+=len;
+      }
+      else
+      {
+        while (len--)
+          buf[p++]=buf[s++];
+      }
     }
 
     if (bp!=bsize)
@@ -567,7 +576,7 @@ int main(int argc, char** argv)
   if (argc<2)
   {
     fprintf(stderr,
-        "LZ4X - An optimized LZ4 compressor, v1.20\n"
+        "LZ4X - An optimized LZ4 compressor, v1.30\n"
         "\n"
         "Usage: %s [options] infile [outfile]\n"
         "\n"
