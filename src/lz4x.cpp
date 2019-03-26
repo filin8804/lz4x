@@ -6,9 +6,13 @@ Written and placed in the public domain by Ilya Muravyov
 
 */
 
-#define _CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES 1
-#define _CRT_SECURE_NO_WARNINGS
-#define _CRT_DISABLE_PERFCRIT_LOCKS
+#ifdef _MSC_VER
+#  define _CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES 1
+#  define _CRT_SECURE_NO_WARNINGS
+#  define _CRT_DISABLE_PERFCRIT_LOCKS
+#else
+#  define _FILE_OFFSET_BITS 64
+#endif
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,7 +31,6 @@ Written and placed in the public domain by Ilya Muravyov
 #endif
 
 #ifndef _MSC_VER
-#  define _FILE_OFFSET_BITS 64
 #  define _fseeki64 fseeko
 #  define _ftelli64 ftello
 
