@@ -251,7 +251,7 @@ void compress_optimal()
 
         while (s>limit)
         {
-          int len=__min(left_len, right_len);
+          int len=MIN(left_len, right_len);
 
           if (g_buf[s+len]==g_buf[p+len])
           {
